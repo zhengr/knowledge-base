@@ -349,6 +349,55 @@ def _self_update_loop():
             print(f"[updater] 更新失败(下次重试): {e}", flush=True)
 
 
+def _distill_loop():
+    """后台线程：每天 UTC 16:45 基于已拉取的 raw/inbox 本地提炼 wiki。
+
+    仅在 LLM_API_KEY 存在时生效（mixtao key 通过容器环境变量注入，不进 GitHub）。
+    依赖 _self_update_loop 先把最新 repo 拉到 KB_PATH（含 raw/inbox）。
+    """
+    import datetime as _dt
+    import subprocess
+
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
+    if not api_key:
+        print("[distill] 未设置 LLM_API_KEY，跳过本地提炼", flush=True)
+        return
+
+    distill_script = "/app/scripts/distill.py"
+    if not os.path.exists(distill_script):
+        print(f"[distill] 找不到 {distill_script}，跳过", flush=True)
+        return
+
+    def do_distill():
+        env = dict(os.environ)
+        env["KB_REPO_ROOT"] = KB_PATH  # distill 把 KB_PATH 当作 REPO_ROOT
+        # 切到 KB_PATH 目录跑，确保 raw/inbox 与 wiki 相对路径正确
+        subprocess.run(
+            ["python", distill_script],
+            cwd=KB_PATH,
+            env=env,
+            timeout=1800,  # 最多 30 分钟
+        )
+        print(f"[distill] 本地提炼完成: {KB_PATH}/wiki", flush=True)
+
+    # 首次立即尝试一次
+    try:
+        do_distill()
+    except Exception as e:
+        print(f"[distill] 首次提炼失败(下次重试): {e}", flush=True)
+    # 之后每天 UTC 16:45（等 updater 16:30 拉完 repo）
+    while True:
+        now = _dt.datetime.now(_dt.timezone.utc)
+        target = now.replace(hour=16, minute=45, second=0, microsecond=0)
+        if target <= now:
+            target = target + _dt.timedelta(days=1)
+        time.sleep((target - now).total_seconds())
+        try:
+            do_distill()
+        except Exception as e:
+            print(f"[distill] 提炼失败(下次重试): {e}", flush=True)
+
+
 def _run_with_auth(host: str, port: int, auth_token: str):
     """用 uvicorn 跑带 Bearer token 认证的 Streamable HTTP 服务。"""
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -392,6 +441,15 @@ if __name__ == "__main__":
             print("[updater] KB_PATH 父目录不可写，跳过自更新", flush=True)
     except Exception as e:
         print(f"[updater] 启动失败: {e}", flush=True)
+
+    # 启动后台本地提炼线程（若 LLM_API_KEY 存在则每天 UTC 16:45 本地生成 wiki）
+    try:
+        if os.environ.get("LLM_API_KEY", "").strip():
+            threading.Thread(target=_distill_loop, daemon=True).start()
+        else:
+            print("[distill] 未设置 LLM_API_KEY，跳过本地提炼", flush=True)
+    except Exception as e:
+        print(f"[distill] 启动失败: {e}", flush=True)
 
     # transport 通过环境变量 KB_TRANSPORT 选择：
     #   "stdio"   -> 标准 stdio 模式（Claude Code/Cursor 用 command 方式连接）

@@ -20,7 +20,10 @@ import glob
 import datetime
 import urllib.request
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.environ.get(
+    "KB_REPO_ROOT",
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
 INBOX = os.path.join(REPO_ROOT, "raw", "inbox")
 WIKI = os.path.join(REPO_ROOT, "wiki")
 TODAY = datetime.date.today().strftime("%Y-%m-%d")

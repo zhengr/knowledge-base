@@ -1,8 +1,8 @@
-name: Knowledge Build (collect + distill)
+name: Knowledge Collect (daily)
 
 on:
   schedule:
-    # 每天 UTC 16:00（北京时间 00:00）自动构建知识库
+    # 每天 UTC 16:00（北京时间 00:00）采集知识源
     - cron: "0 16 * * *"
   workflow_dispatch:
 
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build-knowledge:
+  collect:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,24 +23,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Collect (GitHub + arXiv, free)
+      - name: Collect (GitHub + AI news RSS + arXiv, free, no LLM)
         run: python scripts/collect.py
 
-      - name: Distill (LLM → wiki pages)
-        env:
-          LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: python scripts/distill.py
-
-      - name: Commit & push
+      - name: Commit & push raw inbox
         run: |
           git config user.name "kb-bot"
           git config user.email "kb-bot@users.noreply.github.com"
-          git add raw/ wiki/
+          git add raw/
           if git diff --cached --quiet; then
             echo "无变更，跳过提交"
           else
-            git commit -m "auto: daily knowledge build $(date -u +%Y-%m-%d)"
+            git commit -m "auto: daily collect $(date -u +%Y-%m-%d)"
             git push
           fi
