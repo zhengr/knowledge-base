@@ -1,0 +1,14 @@
+# Local debug / throwaway scripts (never committed)
+_*.py
+_sse_probe.py
+probe*.py
+e2e*.py
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store

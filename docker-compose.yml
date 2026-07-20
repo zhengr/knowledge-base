@@ -1,19 +1,20 @@
-# Portainer「从 git 构建 Stack」用此 compose。
-# 知识库 wiki 内容通过 volume 挂载到 /kb（镜像不含数据）。
-# 修改 KB_PATH 为 Portainer 目标机器上的实际知识库根目录（含 wiki/ 的那层）。
+# 知识库 MCP Server 部署参考
+# 单容器：跑 MCP server + 后台自动更新自构建 wiki
+# 知识库本体通过 volume 挂载（镜像不含 wiki 数据）
 services:
   knowledge-mcp:
-    build: .
-    image: knowledge-mcp:latest
+    image: ghcr.io/zhengr/knowledge-mcp:latest
     container_name: knowledge-mcp
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      - KNOWLEDGE_BASE_PATH=/kb
+      - KNOWLEDGE_BASE_PATH=/data/kb-self
       - KB_TRANSPORT=http
       - KB_HOST=0.0.0.0
       - KB_PORT=8000
+      # 可选：设置后启用 Bearer token 认证（强烈建议公网部署时设置）
+      # - MCP_AUTH_TOKEN=your-secret-token
     volumes:
-      # ⚠️ 改为主机上的真实知识库根目录（含 wiki/ 的目录）
-      - /opt/knowledge-base:/kb:ro
+      # 宿主 /opt 挂载为 rw，容器内部后台线程每天自动拉取最新知识库到 /data/kb-self
+      - /opt:/data:rw
