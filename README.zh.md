@@ -2,9 +2,9 @@
 >
 > # 知识库 — 自构建 MCP 服务
 
-一个**会自动构建**的个人技术知识库：GitHub Actions 每天从 GitHub Trending 和
-arXiv 采集，用 LLM 提炼成结构化 wiki 页面，再由可 Docker/Portainer 部署的
-MCP 服务对外提供语义检索。
+一个**会自动构建**的个人技术知识库：GitHub Actions 每天从 GitHub Trending、
+AI 新闻 RSS 和 arXiv 采集，用 LLM 提炼成结构化 wiki 页面，再由可
+Docker/Portainer 部署的 MCP 服务对外提供语义检索。
 
 > 灵感来自 [mufans/knowledge-base](https://github.com/mufans/knowledge-base)
 > 与 [Karpathy LLM Wiki 方法](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)。
