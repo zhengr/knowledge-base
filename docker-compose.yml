@@ -1,0 +1,19 @@
+# Portainer「从 git 构建 Stack」用此 compose。
+# 知识库 wiki 内容通过 volume 挂载到 /kb（镜像不含数据）。
+# 修改 KB_PATH 为 Portainer 目标机器上的实际知识库根目录（含 wiki/ 的那层）。
+services:
+  knowledge-mcp:
+    build: .
+    image: knowledge-mcp:latest
+    container_name: knowledge-mcp
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - KNOWLEDGE_BASE_PATH=/kb
+      - KB_TRANSPORT=sse
+      - KB_HOST=0.0.0.0
+      - KB_PORT=8000
+    volumes:
+      # ⚠️ 改为主机上的真实知识库根目录（含 wiki/ 的目录）
+      - /opt/knowledge-base:/kb:ro
