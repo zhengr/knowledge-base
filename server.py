@@ -300,60 +300,51 @@ def list_recent(
     return results
 
 
-def _self_update_loop():
-    """后台线程：每天 UTC 16:30 拉取最新自构建知识库覆盖 KB_PATH。
+def _collect_loop():
+    """后台线程：每天 UTC 16:00 本地采集知识源，写入 KB_PATH/raw/inbox。
 
-    仅在 KB_PATH 指向一个可被本进程写到的目录时生效
-    （例如容器以 rw 挂载宿主 /opt，KB_PATH=/data/kb-self）。
-    若目录只读则跳过，避免无意义报错。
+    替代原来的 GitHub 拉取（updater）—— collect 完全在 A1 本地完成，
+    GitHub 不再参与每日流程。仅当 KB_PATH 可写时生效。
     """
-    repo_tarball = os.environ.get(
-        "KB_UPDATE_URL",
-        "https://github.com/zhengr/knowledge-base/archive/refs/heads/main.tar.gz",
-    )
-    # KB_PATH 本身是知识库根目录（含 wiki/），更新时整体替换它
     import datetime as _dt
+    import subprocess
 
-    def do_update():
-        parent = os.path.dirname(KB_PATH) or "."
-        tmp = os.path.join(parent, "._kb_update_tmp")
-        if os.path.exists(tmp):
-            shutil.rmtree(tmp)
-        data = urllib.request.urlopen(repo_tarball, timeout=120).read()
-        os.makedirs(tmp, exist_ok=True)
-        tf = tarfile.open(fileobj=io.BytesIO(data))
-        tf.extractall(tmp, filter="data")
-        top = tf.getnames()[0].split("/")[0]
-        src = os.path.join(tmp, top)
-        if os.path.exists(KB_PATH):
-            shutil.rmtree(KB_PATH)
-        os.rename(src, KB_PATH)
-        shutil.rmtree(tmp)
-        print(f"[updater] 知识库已更新: {KB_PATH}", flush=True)
+    collect_script = "/app/scripts/collect.py"
+    if not os.path.exists(collect_script):
+        print(f"[collect] 找不到 {collect_script}，跳过", flush=True)
+        return
+
+    def do_collect():
+        subprocess.run(
+            ["python", collect_script],
+            cwd=KB_PATH,
+            timeout=600,  # 最多 10 分钟
+        )
+        print(f"[collect] 本地采集完成: {KB_PATH}/raw/inbox", flush=True)
 
     # 首次立即尝试一次
     try:
-        do_update()
+        do_collect()
     except Exception as e:
-        print(f"[updater] 首次更新跳过: {e}", flush=True)
-    # 之后每天 UTC 16:30
+        print(f"[collect] 首次采集失败(下次重试): {e}", flush=True)
+    # 之后每天 UTC 16:00
     while True:
         now = _dt.datetime.now(_dt.timezone.utc)
-        target = now.replace(hour=16, minute=30, second=0, microsecond=0)
+        target = now.replace(hour=16, minute=0, second=0, microsecond=0)
         if target <= now:
             target = target + _dt.timedelta(days=1)
         time.sleep((target - now).total_seconds())
         try:
-            do_update()
+            do_collect()
         except Exception as e:
-            print(f"[updater] 更新失败(下次重试): {e}", flush=True)
+            print(f"[collect] 采集失败(下次重试): {e}", flush=True)
 
 
 def _distill_loop():
-    """后台线程：每天 UTC 16:45 基于已拉取的 raw/inbox 本地提炼 wiki。
+    """后台线程：每天 UTC 16:45 基于本地采集的 raw/inbox 提炼 wiki。
 
     仅在 LLM_API_KEY 存在时生效（mixtao key 通过容器环境变量注入，不进 GitHub）。
-    依赖 _self_update_loop 先把最新 repo 拉到 KB_PATH（含 raw/inbox）。
+    依赖 _collect_loop 先把当日知识源采集到 KB_PATH/raw/inbox。
     """
     import datetime as _dt
     import subprocess
@@ -433,14 +424,14 @@ def _run_with_auth(host: str, port: int, auth_token: str):
 
 
 if __name__ == "__main__":
-    # 启动后台自更新线程（若 KB_PATH 可写则每天拉最新自构建内容）
+    # 启动后台本地采集线程（每天 UTC 16:00，写 KB_PATH/raw/inbox）
     try:
         if os.access(os.path.dirname(KB_PATH) or ".", os.W_OK):
-            threading.Thread(target=_self_update_loop, daemon=True).start()
+            threading.Thread(target=_collect_loop, daemon=True).start()
         else:
-            print("[updater] KB_PATH 父目录不可写，跳过自更新", flush=True)
+            print("[collect] KB_PATH 父目录不可写，跳过本地采集", flush=True)
     except Exception as e:
-        print(f"[updater] 启动失败: {e}", flush=True)
+        print(f"[collect] 启动失败: {e}", flush=True)
 
     # 启动后台本地提炼线程（若 LLM_API_KEY 存在则每天 UTC 16:45 本地生成 wiki）
     try:
