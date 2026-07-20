@@ -279,14 +279,17 @@ def list_recent(
 
 if __name__ == "__main__":
     # transport 通过环境变量 KB_TRANSPORT 选择：
-    #   "stdio" -> 标准 stdio 模式（Claude Code/Cursor 用 command 方式连接）
-    #   "sse"   -> Streamable HTTP 模式（Portainer 常驻、远程用 url 方式连接，推荐）
-    transport = os.environ.get("KB_TRANSPORT", "sse").lower()
+    #   "stdio"   -> 标准 stdio 模式（Claude Code/Cursor 用 command 方式连接）
+    #   "sse"     -> SSE 模式（适合同源/本地，公网远程易遇 Origin 校验 421）
+    #   "http"    -> Streamable HTTP 模式（推荐公网远程，端点 /mcp，无同源校验）
+    transport = os.environ.get("KB_TRANSPORT", "http").lower()
+    host = os.environ.get("KB_HOST", "0.0.0.0")
+    port = int(os.environ.get("KB_PORT", "8000"))
+    mcp.settings.host = host
+    mcp.settings.port = port
     if transport == "stdio":
         mcp.run(transport="stdio")
-    else:
-        host = os.environ.get("KB_HOST", "0.0.0.0")
-        port = int(os.environ.get("KB_PORT", "8000"))
-        mcp.settings.host = host
-        mcp.settings.port = port
+    elif transport == "sse":
         mcp.run(transport="sse")
+    else:
+        mcp.run(transport="streamable-http")

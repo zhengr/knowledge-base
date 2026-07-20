@@ -11,7 +11,7 @@ services:
       - "8000:8000"
     environment:
       - KNOWLEDGE_BASE_PATH=/kb
-      - KB_TRANSPORT=sse
+      - KB_TRANSPORT=http
       - KB_HOST=0.0.0.0
       - KB_PORT=8000
     volumes:

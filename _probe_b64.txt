@@ -1,0 +1,7 @@
+import urllib.request as u
+req = u.Request('http://127.0.0.1:8000/sse', headers={'Accept': 'text/event-stream'})
+try:
+    r = u.urlopen(req, timeout=5)
+    print('SSE_HTTP', r.status, r.headers.get('content-type'))
+except Exception as e:
+    print('ERR', repr(e))
