@@ -85,9 +85,9 @@ Set these as **repository secrets** (Settings → Secrets → Actions):
 
 | Secret | Example |
 |---|---|
-| `LLM_API_BASE` | `http://158.101.23.34:8080/tingly/openai` |
-| `LLM_API_KEY` | `your-key` |
-| `LLM_MODEL` | `mixtao` |
+| `LLM_API_BASE` | `https://api.openai.com/v1` |
+| `LLM_API_KEY` | `sk-...` |
+| `LLM_MODEL` | `gpt-4o-mini` |
 
 ## Tools
 

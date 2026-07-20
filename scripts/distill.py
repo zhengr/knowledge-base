@@ -9,9 +9,9 @@ server.py 的 _parse_frontmatter：
   > score: 综合 X.X/10
 
 LLM 配置（环境变量，缺省走 OpenAI 兼容接口）：
-  LLM_API_BASE  (默认 http://158.101.23.34:8080/tingly/openai)
+  LLM_API_BASE  (默认 https://api.openai.com/v1)
   LLM_API_KEY   (默认空，由调用方注入)
-  LLM_MODEL     (默认 mixtao)
+  LLM_MODEL     (默认 gpt-4o-mini)
 """
 import os
 import sys
@@ -25,9 +25,9 @@ INBOX = os.path.join(REPO_ROOT, "raw", "inbox")
 WIKI = os.path.join(REPO_ROOT, "wiki")
 TODAY = datetime.date.today().strftime("%Y-%m-%d")
 
-API_BASE = os.environ.get("LLM_API_BASE", "http://158.101.23.34:8080/tingly/openai").rstrip("/")
+API_BASE = os.environ.get("LLM_API_BASE", "https://api.openai.com/v1").rstrip("/")
 API_KEY = os.environ.get("LLM_API_KEY", "")
-MODEL = os.environ.get("LLM_MODEL", "mixtao")
+MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
 
 WIKI_SKELETON = """# {title}
 
