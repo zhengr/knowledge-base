@@ -1,4 +1,6 @@
-# 知识库 — 自构建 MCP 服务
+> 🌐 其他语言: [English](README.md) · [日本語](README.ja.md)
+>
+> # 知识库 — 自构建 MCP 服务
 
 一个**会自动构建**的个人技术知识库：GitHub Actions 每天从 GitHub Trending 和
 arXiv 采集，用 LLM 提炼成结构化 wiki 页面，再由可 Docker/Portainer 部署的
@@ -84,5 +86,3 @@ docker run -d --name knowledge-mcp -p 8000:8000 \
 - `search_kb(query, category?, limit?)` — wiki 全文检索
 - `get_entity(name)` — 获取单个 wiki 页面
 - `list_recent(limit?, days?, min_score?)` — 最近更新的页面
-
-另见：[English](README.md) · [日本語](README.ja.md)

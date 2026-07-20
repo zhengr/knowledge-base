@@ -1,4 +1,6 @@
-# 知識ベース — 自動構築型 MCP サーバー
+> 🌐 他言語: [English](README.md) · [中文](README.zh.md)
+>
+> # 知識ベース — 自動構築型 MCP サーバー
 
 自分で**知識を構築する**個人技術ナレッジベースです。GitHub Actions が毎日
 GitHub Trending と arXiv から収集し、LLM で構造化された wiki ページに抽出、
@@ -86,5 +88,3 @@ docker run -d --name knowledge-mcp -p 8000:8000 \
 - `search_kb(query, category?, limit?)` — wiki の全文検索
 - `get_entity(name)` — 単一 wiki ページの取得
 - `list_recent(limit?, days?, min_score?)` — 最近更新されたページ
-
-参照：[English](README.md) · [中文](README.zh.md)

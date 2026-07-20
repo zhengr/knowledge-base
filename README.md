@@ -1,4 +1,6 @@
-# Knowledge Base — Self-Building MCP Server
+> 🌐 Other languages: [中文](README.zh.md) · [日本語](README.ja.md)
+>
+> # Knowledge Base — Self-Building MCP Server
 
 A personal technical knowledge base that **builds itself**: a GitHub Actions
 pipeline collects from GitHub Trending + arXiv daily, distills the content into
@@ -91,5 +93,3 @@ Set these as **repository secrets** (Settings → Secrets → Actions):
 - `search_kb(query, category?, limit?)` — full-text search over the wiki
 - `get_entity(name)` — fetch one wiki page
 - `list_recent(limit?, days?, min_score?)` — recently updated pages
-
-See also: [中文](README.zh.md) · [日本語](README.ja.md)
