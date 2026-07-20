@@ -52,27 +52,39 @@ WIKI_SKELETON = """# {title}
 """
 
 
-def _chat(system, user, max_tokens=1200):
-    payload = {
-        "model": MODEL,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "max_tokens": max_tokens,
-        "temperature": 0.3,
-    }
-    req = urllib.request.Request(
-        f"{API_BASE}/v1/chat/completions",
-        data=json.dumps(payload).encode(),
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = json.loads(r.read().decode())
-    return data["choices"][0]["message"]["content"]
+def _chat(system, user, max_tokens=900):
+    last_err = None
+    # 重试 2 次（应对偶发网络抖动 / 空响应）
+    for attempt in range(3):
+        try:
+            payload = {
+                "model": MODEL,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+            }
+            req = urllib.request.Request(
+                f"{API_BASE}/v1/chat/completions",
+                data=json.dumps(payload).encode(),
+                headers={
+                    "Authorization": f"Bearer {API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=300) as r:
+                data = json.loads(r.read().decode())
+            content = data["choices"][0]["message"]["content"]
+            if not content or not content.strip():
+                last_err = "empty response"
+                continue  # 空响应，重试
+            return content
+        except Exception as e:
+            last_err = e
+            print(f"    [retry {attempt+1}/3] {e}", file=sys.stderr)
+    raise RuntimeError(f"LLM 调用失败: {last_err}")
 
 
 def _clean_json(text):
