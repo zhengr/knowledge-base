@@ -349,6 +349,40 @@ def _self_update_loop():
             print(f"[updater] 更新失败(下次重试): {e}", flush=True)
 
 
+def _run_with_auth(host: str, port: int, auth_token: str):
+    """用 uvicorn 跑带 Bearer token 认证的 Streamable HTTP 服务。"""
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import JSONResponse
+    import uvicorn
+
+    app = mcp.streamable_http_app()
+
+    async def auth_middleware(request, call_next):
+        # 健康检查放行
+        if request.url.path in ("/healthz", "/health", "/"):
+            return await call_next(request)
+        # 校验 token：Authorization: Bearer <t> 或 ?token=<t>
+        auth = request.headers.get("Authorization", "")
+        q_token = request.query_params.get("token", "")
+        ok = False
+        if auth.startswith("Bearer "):
+            ok = auth[len("Bearer "):].strip() == auth_token
+        if not ok and q_token:
+            ok = q_token == auth_token
+        if not ok:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "unauthorized", "message": "missing or invalid MCP_AUTH_TOKEN"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return await call_next(request)
+
+    app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
+
+    print(f"[auth] MCP 端点已启用 Bearer token 认证 (port {port})", flush=True)
+    uvicorn.run(app, host=host, port=port)
+
+
 if __name__ == "__main__":
     # 启动后台自更新线程（若 KB_PATH 可写则每天拉最新自构建内容）
     try:
@@ -366,11 +400,21 @@ if __name__ == "__main__":
     transport = os.environ.get("KB_TRANSPORT", "http").lower()
     host = os.environ.get("KB_HOST", "0.0.0.0")
     port = int(os.environ.get("KB_PORT", "8000"))
-    mcp.settings.host = host
-    mcp.settings.port = port
+
     if transport == "stdio":
+        mcp.settings.host = host
+        mcp.settings.port = port
         mcp.run(transport="stdio")
     elif transport == "sse":
+        mcp.settings.host = host
+        mcp.settings.port = port
         mcp.run(transport="sse")
     else:
-        mcp.run(transport="streamable-http")
+        # Streamable HTTP：支持可选 token 认证
+        auth_token = os.environ.get("MCP_AUTH_TOKEN", "").strip()
+        if auth_token:
+            _run_with_auth(host, port, auth_token)
+        else:
+            mcp.settings.host = host
+            mcp.settings.port = port
+            mcp.run(transport="streamable-http")
