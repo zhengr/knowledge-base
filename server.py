@@ -4,6 +4,12 @@ import json
 import os
 import re
 import subprocess
+import threading
+import time
+import io
+import shutil
+import tarfile
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -294,7 +300,65 @@ def list_recent(
     return results
 
 
+def _self_update_loop():
+    """后台线程：每天 UTC 16:30 拉取最新自构建知识库覆盖 KB_PATH。
+
+    仅在 KB_PATH 指向一个可被本进程写到的目录时生效
+    （例如容器以 rw 挂载宿主 /opt，KB_PATH=/data/kb-self）。
+    若目录只读则跳过，避免无意义报错。
+    """
+    repo_tarball = os.environ.get(
+        "KB_UPDATE_URL",
+        "https://github.com/zhengr/knowledge-base/archive/refs/heads/main.tar.gz",
+    )
+    # KB_PATH 本身是知识库根目录（含 wiki/），更新时整体替换它
+    import datetime as _dt
+
+    def do_update():
+        parent = os.path.dirname(KB_PATH) or "."
+        tmp = os.path.join(parent, "._kb_update_tmp")
+        if os.path.exists(tmp):
+            shutil.rmtree(tmp)
+        data = urllib.request.urlopen(repo_tarball, timeout=120).read()
+        os.makedirs(tmp, exist_ok=True)
+        tf = tarfile.open(fileobj=io.BytesIO(data))
+        tf.extractall(tmp, filter="data")
+        top = tf.getnames()[0].split("/")[0]
+        src = os.path.join(tmp, top)
+        if os.path.exists(KB_PATH):
+            shutil.rmtree(KB_PATH)
+        os.rename(src, KB_PATH)
+        shutil.rmtree(tmp)
+        print(f"[updater] 知识库已更新: {KB_PATH}", flush=True)
+
+    # 首次立即尝试一次
+    try:
+        do_update()
+    except Exception as e:
+        print(f"[updater] 首次更新跳过: {e}", flush=True)
+    # 之后每天 UTC 16:30
+    while True:
+        now = _dt.datetime.now(_dt.timezone.utc)
+        target = now.replace(hour=16, minute=30, second=0, microsecond=0)
+        if target <= now:
+            target = target + _dt.timedelta(days=1)
+        time.sleep((target - now).total_seconds())
+        try:
+            do_update()
+        except Exception as e:
+            print(f"[updater] 更新失败(下次重试): {e}", flush=True)
+
+
 if __name__ == "__main__":
+    # 启动后台自更新线程（若 KB_PATH 可写则每天拉最新自构建内容）
+    try:
+        if os.access(os.path.dirname(KB_PATH) or ".", os.W_OK):
+            threading.Thread(target=_self_update_loop, daemon=True).start()
+        else:
+            print("[updater] KB_PATH 父目录不可写，跳过自更新", flush=True)
+    except Exception as e:
+        print(f"[updater] 启动失败: {e}", flush=True)
+
     # transport 通过环境变量 KB_TRANSPORT 选择：
     #   "stdio"   -> 标准 stdio 模式（Claude Code/Cursor 用 command 方式连接）
     #   "sse"     -> SSE 模式（适合同源/本地，公网远程易遇 Origin 校验 421）
