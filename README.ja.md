@@ -3,9 +3,9 @@
 > # 知識ベース — 自動構築型 MCP サーバー
 
 自分で**知識を構築する**個人技術ナレッジベースです。GitHub Actions が毎日
-GitHub Trending、AI ニュース RSS、arXiv から収集し、LLM で構造化された
-wiki ページに抽出、Docker / Portainer でデプロイ可能な MCP サーバーが
-意味検索を提供します。
+GitHub Trending、AI ニュース RSS（Anthropic は HTML スクレイピング）、arXiv から
+収集し、LLM で構造化された wiki ページに抽出、Docker / Portainer でデプロイ
+可能な MCP サーバーが意味検索を提供します。
 
 > [mufans/knowledge-base](https://github.com/mufans/knowledge-base) および
 > [Karpathy LLM Wiki 手法](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)

@@ -6,7 +6,7 @@
   - AI 新闻 RSS（依据 readless.app 2026 评测的可信源）:
       OpenAI / Hugging Face / MarkTechPost / MIT Tech Review AI /
       Google AI / Ahead of AI (Raschka) / The Gradient / Last Week in AI / The Verge AI
-      （Anthropic 无公开 RSS，未列入）
+      （Anthropic 无公开 RSS，改以 HTML 抓取 Newsroom 页面，同样作为知识来源）
   - arXiv cs.AI: 当日精选论文（RSS）
 
 输出：raw/inbox/YYYY-MM-DD-{GitHub项目,AI新闻,AI论文}.md
@@ -139,6 +139,39 @@ def collect_ai_news():
     return "\n".join(lines)
 
 
+def collect_anthropic():
+    """Anthropic 新闻（无公开 RSS，改抓 HTML 列表页）。"""
+    import re as _re
+    import html as _html
+    url = "https://www.anthropic.com/news"
+    try:
+        html_text = _get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=25)
+        links = _re.findall(r'<a[^>]+href="(/news/[^"]+)"[^>]*>(.*?)</a>', html_text, _re.S)
+        seen = set()
+        items = []
+        for href, inner in links:
+            if href in seen:
+                continue
+            seen.add(href)
+            txt = _html.unescape(_re.sub(r"<[^>]+>", " ", inner)).strip()
+            txt = _re.sub(r"\s+", " ", txt)
+            if len(txt) > 10 and href.startswith("/news/"):
+                items.append((txt, "https://www.anthropic.com" + href))
+        items = items[:10]  # 取最新 10 条
+        lines = [f"# Anthropic 新闻精选 · {TODAY}", ""]
+        lines.append("> 数据来源：Anthropic Newsroom（HTML 抓取，无公开 RSS）")
+        lines.append("")
+        lines.append("## Anthropic")
+        lines.append("")
+        for title, link in items:
+            lines.append(f"- [{title}]({link})")
+        lines.append("")
+        return "\n".join(lines)
+    except Exception as e:
+        print(f"[anthropic] 跳过: {e}", file=sys.stderr)
+        return ""
+
+
 def collect_huggingface():
     """arXiv cs.AI 每日 RSS（完全公开，无需 auth）。"""
     url = "https://rss.arxiv.org/rss/cs.AI"
@@ -176,6 +209,13 @@ def main():
         print(f"[ok] HF 采集 -> {TODAY}-AI论文.md")
     else:
         print("[warn] HF 采集为空，跳过")
+    anth = collect_anthropic()
+    if anth:
+        with open(os.path.join(INBOX, f"{TODAY}-Anthropic新闻.md"), "w") as f:
+            f.write(anth + "\n")
+        print(f"[ok] Anthropic 采集 -> {TODAY}-Anthropic新闻.md")
+    else:
+        print("[warn] Anthropic 采集为空，跳过")
 
 
 if __name__ == "__main__":

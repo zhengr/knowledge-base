@@ -118,6 +118,13 @@ def parse_items(md_text):
             name = name_m.group(1) if name_m else m.group(1)
             if name.startswith("http"):
                 name = m.group(1)
+            # 清理 Anthropic 等 HTML 抓取带来的「分类 日期」前缀
+            import re as _re
+            name = _re.sub(
+                r"^(Announcements|Product|Case Study|Research|Press|Engineering|Safety)\s+"
+                r"[A-Z][a-z]+\s+\d{1,2},?\s*\d{4}\s+",
+                "", name,
+            ).strip()
             desc = line_s.split("](")[0].split("**")[-1][:120]
             items.append((name, url, desc))
             pending_name = None

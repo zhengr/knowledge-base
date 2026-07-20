@@ -3,9 +3,10 @@
 > # Knowledge Base — Self-Building MCP Server
 
 A personal technical knowledge base that **builds itself**: a GitHub Actions
-pipeline collects from GitHub Trending, AI news RSS, and arXiv daily, distills
-the content into structured wiki pages with an LLM, and an MCP server
-(deployable via Docker / Portainer) serves semantic search over it.
+pipeline collects from GitHub Trending, AI news RSS (incl. Anthropic via HTML
+scraping), and arXiv daily, distills the content into structured wiki pages with
+an LLM, and an MCP server (deployable via Docker / Portainer) serves semantic
+search over it.
 
 > Inspired by [mufans/knowledge-base](https://github.com/mufans/knowledge-base)
 > and the [Karpathy LLM Wiki method](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
