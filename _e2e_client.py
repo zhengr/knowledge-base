@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, json
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.client.session import ClientSession
 
@@ -10,12 +10,10 @@ async def main():
             tools = await sess.list_tools()
             print("TOOLS:", [t.name for t in tools.tools])
             res = await sess.call_tool("search_kb", {"query": "MCP", "limit": 2})
-            for c in res.content:
+            print("RAW content blocks:", len(res.content))
+            for i, c in enumerate(res.content):
                 if hasattr(c, "text"):
-                    import json
-                    data = json.loads(c.text)
-                    print("search_kb('MCP') -> %d 条" % len(data))
-                    for d in data[:2]:
-                        print("  -", d["path"], "| score=", d.get("score"))
+                    print("block[%d] type=%s" % (i, type(c.text)))
+                    print("block[%d] raw=%s" % (i, c.text[:500]))
 
 asyncio.run(main())
