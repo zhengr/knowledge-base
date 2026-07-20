@@ -3,9 +3,13 @@
 
 数据源（全部免费，无需付费 LLM）：
   - GitHub Search API: 每日热门 AI/Agent/移动端/开发工具项目（按 star 排序）
-  - HuggingFace Daily Papers: 当日 arXiv 精选论文（RSS）
+  - AI 新闻 RSS（依据 readless.app 2026 评测的可信源）:
+      OpenAI / Hugging Face / MarkTechPost / MIT Tech Review AI /
+      Google AI / Ahead of AI (Raschka) / The Gradient / Last Week in AI / The Verge AI
+      （Anthropic 无公开 RSS，未列入）
+  - arXiv cs.AI: 当日精选论文（RSS）
 
-输出：raw/inbox/YYYY-MM-DD-GitHub项目.md, YYYY-MM-DD-AI论文.md
+输出：raw/inbox/YYYY-MM-DD-{GitHub项目,AI新闻,AI论文}.md
 """
 import os
 import sys
@@ -18,6 +22,20 @@ import xml.etree.ElementTree as ET
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INBOX = os.path.join(REPO_ROOT, "raw", "inbox")
 TODAY = datetime.date.today().strftime("%Y-%m-%d")
+
+# AI 新闻 RSS 源（来源：https://www.readless.app/blog/best-ai-news-rss-feeds-2026）
+# 注：Anthropic 无公开 RSS feed（仅 https://www.anthropic.com/news 网页），故不列入自动拉取。
+AI_NEWS_FEEDS = [
+    ("OpenAI", "https://openai.com/news/rss.xml"),
+    ("Hugging Face", "https://huggingface.co/blog/feed.xml"),
+    ("MarkTechPost", "https://www.marktechpost.com/feed/"),
+    ("MIT Tech Review AI", "https://www.technologyreview.com/topic/artificial-intelligence/feed/"),
+    ("Google AI", "https://blog.google/technology/ai/rss/"),
+    ("Ahead of AI (Raschka)", "https://magazine.sebastianraschka.com/feed"),
+    ("The Gradient", "https://thegradient.pub/rss/"),
+    ("Last Week in AI", "https://lastweekin.ai/feed"),
+    ("The Verge AI", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
+]
 
 
 def _get(url, headers=None, timeout=20):
@@ -74,18 +92,59 @@ def collect_github():
     return "\n".join(lines)
 
 
+def _parse_rss(xml_text):
+    """从 RSS/Atom XML 解析出 (title, link) 列表，兼容 RSS 与 Atom。"""
+    root = ET.fromstring(xml_text)
+    items = []
+    # RSS: <item><title><link>
+    for it in root.iter("item"):
+        title = (it.findtext("title") or "").strip()
+        link = (it.findtext("link") or "").strip()
+        if title and link:
+            items.append((title, link))
+    # Atom: <entry><title><link href=...>
+    if not items:
+        for entry in root.iter("{http://www.w3.org/2005/Atom}entry"):
+            title = (entry.findtext("{http://www.w3.org/2005/Atom}title") or "").strip()
+            link = ""
+            for l in entry.iter("{http://www.w3.org/2005/Atom}link"):
+                link = l.get("href") or link
+            if title and link:
+                items.append((title, link))
+    return items
+
+
+def collect_ai_news():
+    """AI 新闻 RSS 聚合（readless.app 2026 评测的 10 个可信源）。"""
+    lines = [f"# AI 新闻精选 · {TODAY}", ""]
+    lines.append("> 数据来源：AI 新闻 RSS（OpenAI / Anthropic / Hugging Face / MarkTechPost / "
+                 "MIT Tech Review / Google AI / Ahead of AI / The Gradient / Last Week in AI / The Verge AI）")
+    lines.append("")
+    total = 0
+    for name, url in AI_NEWS_FEEDS:
+        try:
+            xml = _get(url, timeout=25)
+            items = _parse_rss(xml)[:5]  # 每源取最新 5 条，控制体量
+            if not items:
+                continue
+            lines.append(f"## {name}")
+            lines.append("")
+            for title, link in items:
+                lines.append(f"- [{title}]({link})")
+            lines.append("")
+            total += len(items)
+        except Exception as e:
+            print(f"[news:{name}] 跳过: {e}", file=sys.stderr)
+    lines.append(f"> 共聚合 {total} 条新闻")
+    return "\n".join(lines)
+
+
 def collect_huggingface():
-    """arXiv cs.AI / cs.CL 每日 RSS（完全公开，无需 auth）。"""
-    url = "http://export.arxiv.org/rss/cs.AI"
+    """arXiv cs.AI 每日 RSS（完全公开，无需 auth）。"""
+    url = "https://rss.arxiv.org/rss/cs.AI"
     try:
         xml = _get(url)
-        root = ET.fromstring(xml)
-        papers = []
-        for item in root.iter("item"):
-            title = (item.findtext("title") or "").strip()
-            link = item.findtext("link") or ""
-            if title and link:
-                papers.append((title, link))
+        papers = _parse_rss(xml)
         lines = [f"# AI 论文精选 · {TODAY}", ""]
         lines.append("> 数据来源：arXiv cs.AI RSS（每日最新）")
         lines.append("")
@@ -106,6 +165,10 @@ def main():
     with open(os.path.join(INBOX, f"{TODAY}-GitHub项目.md"), "w") as f:
         f.write(gh + "\n")
     print(f"[ok] GitHub 采集 -> {TODAY}-GitHub项目.md")
+    news = collect_ai_news()
+    with open(os.path.join(INBOX, f"{TODAY}-AI新闻.md"), "w") as f:
+        f.write(news + "\n")
+    print(f"[ok] AI 新闻采集 -> {TODAY}-AI新闻.md ({news.count(chr(10)+'- [')} 条)")
     hf = collect_huggingface()
     if hf:
         with open(os.path.join(INBOX, f"{TODAY}-AI论文.md"), "w") as f:
