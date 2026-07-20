@@ -74,7 +74,7 @@ def _chat(system, user, max_tokens=900):
                     "Content-Type": "application/json",
                 },
             )
-            with urllib.request.urlopen(req, timeout=300) as r:
+            with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.loads(r.read().decode())
             content = data["choices"][0]["message"]["content"]
             if not content or not content.strip():
