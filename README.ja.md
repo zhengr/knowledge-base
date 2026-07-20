@@ -14,15 +14,20 @@ GitHub Trending、AI ニュース RSS（Anthropic は HTML スクレイピング
 ## 仕組み
 
 ```
-GitHub Actions（毎日 UTC 16:00）
-  ├─ scripts/collect.py  → raw/inbox/   （GitHub Trending + arXiv RSS、無料）
-  ├─ scripts/distill.py  → wiki/         （LLM が entities/sources へ抽出）
+GitHub Actions（毎日 UTC 16:00）— 収集のみ、LLM key 不使用
+  ├─ scripts/collect.py  → raw/inbox/   （GitHub + AI ニュース RSS + arXiv、無料）
   └─ このリポジトリへ自動コミット＆プッシュ
         ↓  （A1 ホストがリポジトリを取得）
-MCP コンテナ（knowledge-mcp）
-  ├─ /mcp エンドポイント提供（Streamable HTTP、Bearer 認証は任意）
-  └─ バックグラウンドスレッドが毎日 UTC 16:30 に最新 wiki を再取得
+MCP コンテナ（knowledge-mcp）は A1 で稼働
+  ├─ バックグラウンドスレッド（UTC 16:30）：最新リポジトリを再取得 → /data/kb-self
+  ├─ バックグラウンドスレッド（UTC 16:45）：scripts/distill.py → wiki/
+  │     （LLM key はコンテナ環境変数のみに存在し、GitHub を通らない）
+  └─ /mcp エンドポイント提供（Streamable HTTP、Bearer 認証は任意）でローカル wiki を検索
 ```
+
+> **セキュリティ注意**：LLM API key は A1 ホストのコンテナ環境変数として注入
+> されます。GitHub が触れるのは key 不要の無料収集結果のみ——抽出はすべて
+> あなたのマシン上で発生します。
 
 ## リポジトリ構成
 

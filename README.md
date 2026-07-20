@@ -14,22 +14,27 @@ search over it.
 ## How it works
 
 ```
-GitHub Actions (daily, UTC 16:00)
-  ├─ scripts/collect.py  → raw/inbox/   (GitHub Trending + arXiv RSS, free)
-  ├─ scripts/distill.py  → wiki/         (LLM distills into entities/sources)
-  └─ commit & push back to this repo
+GitHub Actions (daily, UTC 16:00) — collect only, no LLM key
+  ├─ scripts/collect.py  → raw/inbox/   (GitHub + AI news RSS + arXiv, free)
+  └─ commit & push raw/inbox back to this repo
         ↓  (A1 host pulls the repo)
-MCP container (knowledge-mcp)
-  ├─ serves /mcp  (Streamable HTTP, optional Bearer auth)
-  └─ background thread re-pulls latest wiki daily at UTC 16:30
+MCP container (knowledge-mcp) on A1
+  ├─ background thread (UTC 16:30): re-pulls latest repo → /data/kb-self
+  ├─ background thread (UTC 16:45): scripts/distill.py → wiki/
+  │     (LLM key lives ONLY in the container env, never touches GitHub)
+  └─ serves /mcp  (Streamable HTTP, optional Bearer auth) over the local wiki
 ```
+
+> **Security note:** the LLM API key is injected as a container environment
+> variable on the A1 host. GitHub only ever sees the free, key-less collection
+> output — distillation happens entirely on your machine.
 
 ## Repository layout
 
 ```
 .github/workflows/
   build.yml      # build arm64 image → ghcr.io/zhengr/knowledge-mcp
-  knowledge.yml  # daily collect + distill + push
+  knowledge.yml  # daily collect only (distill runs locally on A1)
 Dockerfile
 docker-compose.yml
 scripts/
