@@ -18,6 +18,23 @@ CATEGORIES = ["concepts", "entities", "sources", "syntheses"]
 
 mcp = FastMCP("knowledge-base")
 
+# 允许公网/远程访问：关闭 DNS rebinding 防护并放行所有 Host。
+# 默认 allowed_hosts 仅含 localhost/127.0.0.1，会导致跨机访问返回 421。
+try:
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    mcp.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+        allowed_hosts=["*"],
+        allowed_origins=["*"],
+    )
+except Exception:
+    ts = mcp.settings.transport_security
+    if ts is not None:
+        ts.enable_dns_rebinding_protection = False
+        ts.allowed_hosts = ["*"]
+        ts.allowed_origins = ["*"]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
