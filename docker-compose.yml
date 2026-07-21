@@ -1,6 +1,6 @@
 # 知识库 MCP Server 部署参考
-# 单容器：跑 MCP server + 后台自动更新自构建 wiki
-# 知识库本体通过 volume 挂载（镜像不含 wiki 数据）
+# 单容器：MCP server + 本地采集(collect) + 本地提炼(distill) 三合一
+# 每日流程完全在 A1 本地闭环，不经过 GitHub / Portainer
 services:
   knowledge-mcp:
     image: ghcr.io/zhengr/knowledge-mcp:latest
@@ -13,8 +13,14 @@ services:
       - KB_TRANSPORT=http
       - KB_HOST=0.0.0.0
       - KB_PORT=8000
+      # 本地提炼所需 LLM 配置（mixtao key 仅存在于容器 env，不进 GitHub）
+      # - LLM_API_BASE=https://api.openai.com/v1
+      # - LLM_API_KEY=sk-...
+      # - LLM_MODEL=gpt-4o-mini
       # 可选：设置后启用 Bearer token 认证（强烈建议公网部署时设置）
       # - MCP_AUTH_TOKEN=your-secret-token
     volumes:
-      # 宿主 /opt 挂载为 rw，容器内部后台线程每天自动拉取最新知识库到 /data/kb-self
+      # 宿主 /opt 挂载为 rw：
+      #   /data/kb-self/raw/inbox/  ← collect 线程每日 UTC 16:00 写入
+      #   /data/kb-self/wiki/       ← distill 线程每日 UTC 16:45 生成
       - /opt:/data:rw
