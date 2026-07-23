@@ -399,15 +399,14 @@ def _run_with_auth(host: str, port: int, auth_token: str):
 
     # 知识图谱可视化页面：访问 /graph 即可查看（通过浏览器 JS 调 /mcp 拉取数据）
     from starlette.responses import HTMLResponse
-    _GRAPH_HTML = None
+    _GRAPH_HTML = [None]  # 用 list 包一层避免 global 作用域问题
     def _load_graph_html():
-        global _GRAPH_HTML
-        if _GRAPH_HTML is not None: return _GRAPH_HTML
+        if _GRAPH_HTML[0] is not None: return _GRAPH_HTML[0]
         try:
-            _GRAPH_HTML = open("/app/knowledge-graph.html", encoding="utf-8").read()
+            _GRAPH_HTML[0] = open("/app/knowledge-graph.html", encoding="utf-8").read()
         except Exception:
-            _GRAPH_HTML = "<h1>knowledge-graph.html not found in image</h1>"
-        return _GRAPH_HTML
+            _GRAPH_HTML[0] = "<h1>knowledge-graph.html not found in image</h1>"
+        return _GRAPH_HTML[0]
 
     async def graph_route(request):
         return HTMLResponse(_load_graph_html())
