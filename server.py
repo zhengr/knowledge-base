@@ -419,6 +419,10 @@ def _run_with_auth(host: str, port: int, auth_token: str):
 
     app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 
+    # CORS 中间件：允许浏览器端直接 fetch MCP 端点（知识图谱可视化等）
+    from starlette.middleware.cors import CORSMiddleware
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
     print(f"[auth] MCP 端点已启用 Bearer token 认证 (port {port})", flush=True)
     uvicorn.run(app, host=host, port=port)
 
