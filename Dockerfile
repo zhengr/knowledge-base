@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY server.py /app/server.py
 COPY scripts/ /app/scripts/
+COPY knowledge-graph.html /app/knowledge-graph.html
 
 # 知识库内容通过 volume 挂载（镜像不含 wiki 数据）
 ENV KNOWLEDGE_BASE_PATH=/kb

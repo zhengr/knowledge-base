@@ -397,9 +397,28 @@ def _run_with_auth(host: str, port: int, auth_token: str):
 
     app = mcp.streamable_http_app()
 
+    # 知识图谱可视化页面：访问 /graph 即可查看（通过浏览器 JS 调 /mcp 拉取数据）
+    from starlette.responses import HTMLResponse
+    _GRAPH_HTML = None
+    def _load_graph_html():
+        global _GRAPH_HTML
+        if _GRAPH_HTML is not None: return _GRAPH_HTML
+        try:
+            _GRAPH_HTML = open("/app/knowledge-graph.html", encoding="utf-8").read()
+        except Exception:
+            _GRAPH_HTML = "<h1>knowledge-graph.html not found in image</h1>"
+        return _GRAPH_HTML
+
+    async def graph_route(request):
+        return HTMLResponse(_load_graph_html())
+
+    # Starlette 路由需要在 app 构建后通过 mount 或直接添加
+    from starlette.routing import Route
+    app.routes.insert(0, Route("/graph", graph_route, methods=["GET"]))
+
     async def auth_middleware(request, call_next):
-        # 健康检查放行
-        if request.url.path in ("/healthz", "/health", "/"):
+        # 健康检查和知识图谱页面放行（无需 token）
+        if request.url.path in ("/healthz", "/health", "/", "/graph"):
             return await call_next(request)
         # 校验 token：Authorization: Bearer <t> 或 ?token=<t>
         auth = request.headers.get("Authorization", "")

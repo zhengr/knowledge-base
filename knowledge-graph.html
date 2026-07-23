@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Base — 知识图谱</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:#0a0e1a; color:#e2e8f0; overflow:hidden; }
+#app { display:flex; height:100vh; }
+#sidebar { width:340px; min-width:340px; background:#111827; border-right:1px solid #1e293b; padding:1.5rem; overflow-y:auto; }
+#sidebar h1 { font-size:1.25rem; margin-bottom:.25rem; color:#22d3ee; }
+#sidebar .subtitle { font-size:.8rem; color:#64748b; margin-bottom:1.5rem; }
+#sidebar h2 { font-size:.9rem; color:#94a3b8; margin:1.5rem 0 .5rem; text-transform:uppercase; letter-spacing:.05em; }
+.stats { display:flex; gap:.75rem; margin-bottom:1rem; }
+.stat { flex:1; background:#1e293b; border-radius:8px; padding:.75rem; text-align:center; }
+.stat .num { font-size:1.5rem; font-weight:700; color:#22d3ee; }
+.stat .lbl { font-size:.7rem; color:#64748b; text-transform:uppercase; }
+.search-box { position:relative; margin-bottom:1rem; }
+.search-box input { width:100%; padding:.6rem .9rem .6rem 2.2rem; background:#1e293b; border:1px solid #334155; border-radius:8px; color:#e2e8f0; font-size:.85rem; outline:none; }
+.search-box input:focus { border-color:#22d3ee; }
+.search-box input::placeholder { color:#475569; }
+.search-box .icon { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:#475569; font-size:.9rem; }
+.tag-cloud { display:flex; flex-wrap:wrap; gap:.4rem; }
+.tag-pill { padding:.25rem .6rem; border-radius:12px; font-size:.72rem; cursor:pointer; transition:all .2s; }
+.tag-pill:hover { transform:scale(1.1); }
+.legend-item { display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; font-size:.78rem; }
+.legend-dot { width:12px; height:12px; border-radius:50%; }
+#detail { position:fixed; right:0; top:0; height:100vh; width:380px; background:#111827; border-left:1px solid #1e293b; padding:1.5rem; overflow-y:auto; transform:translateX(380px); transition:transform .3s; z-index:200; box-shadow:-4px 0 20px rgba(0,0,0,.3); }
+#detail.open { transform:translateX(0); }
+#detail h2 { font-size:1.1rem; margin-bottom:.5rem; color:#22d3ee; line-height:1.4; }
+#detail .meta { font-size:.8rem; color:#64748b; margin-bottom:.5rem; }
+#detail .tags { margin:.5rem 0; }
+#detail .tag-s { display:inline-block; padding:.15rem .5rem; margin:.15rem; border-radius:8px; font-size:.72rem; background:#1e293b; }
+#detail .summary { margin-top:.75rem; font-size:.85rem; line-height:1.6; color:#cbd5e1; }
+#detail .close { position:absolute; top:1rem; right:1rem; cursor:pointer; font-size:1.5rem; color:#64748b; }
+#detail .close:hover { color:#e2e8f0; }
+#graph { flex:1; position:relative; overflow:hidden; }
+#graph svg { width:100%; height:100%; cursor:grab; }
+#graph svg:active { cursor:grabbing; }
+.node { cursor:pointer; }
+.node circle { transition:all .15s; }
+.node:hover circle { stroke-width:3; filter:drop-shadow(0 0 4px currentColor); }
+.node.dimmed { opacity:.15; }
+.link { stroke:#1e293b; stroke-opacity:.25; transition:all .15s; }
+.link.highlight { stroke:#22d3ee; stroke-opacity:.8; stroke-width:2; }
+.link.dimmed { stroke-opacity:.05; }
+.node-label { font-size:10px; fill:#94a3b8; pointer-events:none; text-anchor:middle; font-family:'Segoe UI',sans-serif; }
+.node-label.dimmed { opacity:.15; }
+#controls { position:absolute; top:1rem; left:1rem; display:flex; gap:.5rem; z-index:10; }
+.btn { padding:.4rem .8rem; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#94a3b8; font-size:.75rem; cursor:pointer; transition:all .15s; }
+.btn:hover { background:#334155; color:#e2e8f0; }
+.btn.active { background:#22d3ee; color:#0a0e1a; border-color:#22d3ee; }
+#zoom-controls { position:absolute; bottom:1rem; right:1rem; display:flex; flex-direction:column; gap:.3rem; z-index:10; }
+#zoom-controls .btn { padding:.35rem .6rem; font-size:1rem; }
+#status { position:absolute; bottom:1rem; left:1rem; font-size:.72rem; color:#475569; z-index:10; }
+#loading { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#22d3ee; font-size:1rem; z-index:50; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <h1>🧠 Knowledge Base</h1>
+    <p class="subtitle">自构建知识图谱 · MCP 实时数据</p>
+    <div class="stats">
+      <div class="stat"><div class="num" id="stat-nodes">-</div><div class="lbl">条目</div></div>
+      <div class="stat"><div class="num" id="stat-tags">-</div><div class="lbl">标签</div></div>
+      <div class="stat"><div class="num" id="stat-links">-</div><div class="lbl">连线</div></div>
+    </div>
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input type="text" id="search" placeholder="搜索条目或标签..." autocomplete="off">
+    </div>
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+      <button class="btn active" id="btn-all" style="flex:1">全部</button>
+      <button class="btn" id="btn-entities" style="flex:1">项目</button>
+      <button class="btn" id="btn-sources" style="flex:1">新闻/论文</button>
+    </div>
+    <h2>🏷️ 标签云</h2>
+    <div class="tag-cloud" id="tag-cloud"></div>
+    <h2>📐 图例</h2>
+    <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>Entities（开源项目/工具）</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>Sources（新闻/论文）</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22d3ee;opacity:.5"></div>标签（共现聚类）</div>
+    <h2>💡 操作</h2>
+    <p style="font-size:.75rem;color:#64748b;line-height:1.5">点击节点→详情 · 拖拽节点→重布局 · 滚轮→缩放 · 拖空白→平移 · 搜索→高亮匹配</p>
+  </div>
+  <div id="graph">
+    <div id="loading">⏳ 从 MCP 加载知识库...</div>
+    <svg id="svg"></svg>
+    <div id="controls"></div>
+    <div id="zoom-controls">
+      <button class="btn" id="zoom-in" title="放大">＋</button>
+      <button class="btn" id="zoom-out" title="缩小">－</button>
+      <button class="btn" id="zoom-reset" title="重置">⤢</button>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>
+<div id="detail">
+  <span class="close" onclick="document.getElementById('detail').classList.remove('open')">✕</span>
+  <h2 id="d-title"></h2>
+  <div class="meta" id="d-meta"></div>
+  <div class="tags" id="d-tags"></div>
+  <div class="summary" id="d-summary"></div>
+</div>
+
+<script>
+// === Config: MCP endpoint ===
+const MCP_URL = (() => {
+  // 部署在 A1 上时用相对路径；本地打开时用完整 URL
+  if (location.hostname === '158.101.23.34') return 'http://158.101.23.34:8000/mcp';
+  if (location.protocol === 'file:') return 'http://158.101.23.34:8000/mcp';
+  return location.origin + '/mcp';
+})();
+const MCP_TOKEN = '431e6ff75197e5764b36ab261ba7874d83e289af1c349b8d';
+
+const NODE_COLOR = { entities: '#34d399', sources: '#fbbf24', tag: '#22d3ee' };
+let PAGES = [], nodes = [], links = [], nodeMap = {};
+let svgEl, W, H;
+let zoom = 1, panX = 0, panY = 0;
+let currentFilter = null;
+
+// === Fetch from MCP ===
+async function fetchPages() {
+  // 动态 import MCP client（如果环境支持）
+  // 浏览器里没有 mcp SDK，改用 fetch 直接调 streamable-http
+  const resp = await fetch(MCP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_TOKEN}` },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1, method: 'initialize',
+      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'kg-graph', version: '1.0' } }
+    })
+  });
+  // streamable-http 需要先 initialize 再 call tool
+  const sessHeader = resp.headers.get('Mcp-Session-Id') || '';
+  const initBody = await resp.json();
+
+  async function callTool(name, args) {
+    const r = await fetch(MCP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name, arguments: args } })
+    });
+    const body = await r.json();
+    if (body.error) throw new Error(JSON.stringify(body.error));
+    // result.content 是数组，每个有 text 字段
+    const items = [];
+    if (body.result && body.result.content) {
+      for (const c of body.result.content) {
+        if (c.text) { try { items.push(JSON.parse(c.text)); } catch {} }
+      }
+    }
+    return items;
+  }
+
+  // 发送 initialized 通知
+  await fetch(MCP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
+    body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
+  });
+
+  const pages = await callTool('list_recent', { limit: 200 });
+  return pages;
+}
+
+// === Fallback: embedded data (if MCP fetch fails) ===
+const FALLBACK_PAGES = [
+  {title:"Andrej-Karpathy-Skills",path:"entities/Andrej-Karpathy-Skills.md",category:"entities",score:7.5,tags:["AI","PromptEngineering","ClaudeCode","AgentSkills"],summary:"将 Karpathy 关于 LLM、神经网络与软件工程的核心理念封装为 Claude Code 可加载的 Agent Skills。"},
+  {title:"Hermes-Agent",path:"entities/Hermes-Agent.md",category:"entities",score:8.0,tags:["AI-Agent","Function-Calling","LLM-Framework","NousResearch","Open-Source"],summary:"NousResearch 开源的 AI 智能体框架，基于 Hermes 系列模型提供函数调用、工具使用与多轮推理能力。"},
+  {title:"Flutter",path:"entities/Flutter.md",category:"entities",score:7.5,tags:["flutter","cross-platform","ui-framework","dart"],summary:"Google 开源的跨平台 UI 工具包，通过 Dart + Skia 引擎实现多端统一 UI 构建。"},
+  {title:"ECC",path:"entities/ECC.md",category:"entities",score:7.0,tags:["ECC","EllipticCurveCryptography","Cryptography","Python"],summary:"椭圆曲线密码学教育性 Python 实现，涵盖点运算与 ECDH 密钥交换。"},
+  {title:"Superpowers",path:"entities/Superpowers.md",category:"entities",score:8.0,tags:["GameEngine","TypeScript","RealTimeCollaboration","EntityComponentSystem"],summary:"基于 TypeScript 的协作式游戏引擎，支持实时多人编辑与 HTML5 部署。"},
+  {title:"opencode",path:"entities/opencode.md",category:"entities",score:7.5,tags:["opencode","terminal-ai","coding-agent","cli-tool"],summary:"基于终端的 AI 编程代理，通过 TUI 提供交互式编码辅助。"},
+  {title:"claw-code",path:"entities/claw-code.md",category:"entities",score:7.5,tags:["claude-code","ai-coding","cli-agent","anthropic"],summary:"Claude Code 增强工具，扩展 Anthropic 的 CLI 编码助手能力。"},
+  {title:"mattpocock-skills",path:"entities/mattpocock-skills.md",category:"entities",score:7.5,tags:["typescript","ai-skills","prompt-engineering","llm"],summary:"TypeScript 专家的 AI 技能库，将领域知识封装为可复用实体。"},
+  {title:"obra-superpowers",path:"entities/obra-superpowers.md",category:"entities",score:7.5,tags:["ai-agent","entity-extraction","knowledge-graph","context-management"],summary:"为 AI Agent 提供实体状态管理与上下文增强的工具集。"},
+  {title:"Claude-Sonnet-5",path:"sources/Claude-Sonnet-5.md",category:"sources",score:7.5,tags:["Claude","LLM","CodingAgent"],summary:"Anthropic 中端大模型，编程/代理/专业任务前沿性能，平衡推理速度与成本。"},
+  {title:"Claude-Science",path:"sources/Claude-Science.md",category:"sources",score:7.5,tags:["AIScience","ResearchTools","Claude"],summary:"可定制科研 AI 工作台，整合科研工具，生成可审计产物。"},
+  {title:"Claude-for-Teachers",path:"sources/Claude-for-Teachers.md",category:"sources",score:7.5,tags:["Claude","Education","Anthropic"],summary:"为教师提供备课、批改、答疑的 AI 教育产品。"},
+  {title:"GPT-Red",path:"sources/GPT-Red.md",category:"sources",score:7.5,tags:["GPT-Red","SelfImprovement","Robustness"],summary:"OpenAI 通过红队对抗样本让模型自我改进提升鲁棒性。"},
+  {title:"Redeploying-Fable-5",path:"sources/Redeploying-Fable-5.md",category:"sources",score:7.5,tags:["Fable5","AI","Jailbreak"],summary:"Fable 5 全球重新部署，联合 Amazon/Microsoft/Google 提出越狱严重程度评分框架。"},
+  {title:"Cura-1T",path:"sources/Cura-1T.md",category:"sources",score:8.0,tags:["LLM","Healthcare","AgenticAI","MedicalModel","Reasoning"],summary:"万亿参数医疗智能体专用大模型，结合临床推理与医疗知识。"},
+  {title:"GraphDx",path:"sources/GraphDx.md",category:"sources",score:7.5,tags:["multi-agent","sequential-diagnosis","knowledge-graph","cost-aware"],summary:"序贯诊断多智能体框架，结合知识图谱与成本感知策略。"},
+  {title:"Causal-Audit",path:"sources/Causal-Audit.md",category:"sources",score:8.0,tags:["causal-reasoning","graph-reasoning","llm-auditing","explainable-ai","knowledge-graph"],summary:"通过显式因果链进行可审计图推理，让 LLM 推理过程可追溯。"},
+  {title:"NVIDIA-NeMo-Automodel",path:"sources/NVIDIA-NeMo.md",category:"sources",score:7.5,tags:["NVIDIA","NeMoAutomodel","Diffusers","FineTuning","Multimodal"],summary:"在 Hugging Face Diffusers 上大规模微调文生图/视频扩散模型。"},
+  {title:"Security-incident",path:"sources/Security-incident.md",category:"sources",score:7.5,tags:["security","incident","huggingface"],summary:"Hugging Face 2026年7月安全事件披露，涉及部分用户 API 令牌泄露。"},
+  {title:"AnovaX",path:"sources/AnovaX.md",category:"sources",score:7.5,tags:["LocalAI","MultiAgent","VoiceAssistant","LLMPlanning"],summary:"完全本地运行的语音助手，多智能体架构。"},
+  {title:"DrawingVQA",path:"sources/DrawingVQA.md",category:"sources",score:7.5,tags:["VQA","ConstructionDrawings","VisualReasoning","Benchmark"],summary:"建筑图纸多深度视觉文本推理基准。"},
+  {title:"US-AI-safety",path:"sources/US-AI-safety.md",category:"sources",score:7.5,tags:["AISafety","USPolicy","GovernmentAction"],summary:"美国通过州级和联邦行动推进 AI 安全监管。"},
+];
+
+// === Build graph from pages ===
+function buildGraph(pages) {
+  PAGES = pages;
+  const allTags = {};
+  pages.forEach(p => { p.tags.forEach(t => { allTags[t] = (allTags[t]||0)+1; }); });
+
+  nodes = []; links = []; nodeMap = {};
+  pages.forEach((p,i) => {
+    const id = "p"+i;
+    const node = { id, type:"page", label:p.title, page:p, color:NODE_COLOR[p.category], r:8+p.score*0.8, category:p.category };
+    nodes.push(node); nodeMap[id] = node;
+    p.tags.forEach(t => {
+      const tagId = "t_"+t.replace(/[^a-zA-Z0-9]/g,'_');
+      if (!nodeMap[tagId]) {
+        const tn = { id:tagId, type:"tag", label:t, color:NODE_COLOR.tag, r:4+(allTags[t]||1)*0.5, opacity:0.5 };
+        nodes.push(tn); nodeMap[tagId] = tn;
+      }
+      links.push({ source:id, target:tagId });
+    });
+  });
+
+  // Stats
+  document.getElementById('stat-nodes').textContent = pages.length;
+  document.getElementById('stat-tags').textContent = Object.keys(allTags).length;
+  document.getElementById('stat-links').textContent = links.length;
+
+  // Tag cloud
+  const tc = document.getElementById('tag-cloud');
+  tc.innerHTML = '';
+  Object.entries(allTags).sort((a,b)=>b[1]-a[1]).forEach(([tag,count]) => {
+    const el = document.createElement('span');
+    el.className = 'tag-pill';
+    el.textContent = `${tag} (${count})`;
+    el.style.background = `rgba(34,211,238,${Math.min(0.1+count*0.04,0.4)})`;
+    el.style.color = '#22d3ee';
+    el.style.border = '1px solid rgba(34,211,238,0.25)';
+    el.onclick = () => highlightTag(tag);
+    tc.appendChild(el);
+  });
+
+  // Layout
+  nodes.forEach((n,i) => {
+    const angle = i * 2 * Math.PI / Math.min(nodes.length, 60);
+    const radius = Math.min(W,H) * 0.3 + (n.type === "tag" ? 80 : 0);
+    n.x = W/2 + Math.cos(angle) * radius + Math.random()*60-30;
+    n.y = H/2 + Math.sin(angle) * radius + Math.random()*60-30;
+    n.vx = 0; n.vy = 0;
+  });
+  simulate(300);
+  render();
+}
+
+// === Force simulation ===
+function simulate(iterations) {
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i=0;i<nodes.length;i++) {
+      for (let j=i+1;j<nodes.length;j++) {
+        let dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+        let dist = Math.sqrt(dx*dx+dy*dy)||1;
+        let force = (nodes[i].type==="tag" && nodes[j].type==="tag") ? 200 : 500;
+        force /= (dist*dist);
+        nodes[i].vx += dx/dist*force; nodes[i].vy += dy/dist*force;
+        nodes[j].vx -= dx/dist*force; nodes[j].vy -= dy/dist*force;
+      }
+    }
+    links.forEach(l => {
+      const s = nodeMap[l.source], t = nodeMap[l.target];
+      if (!s||!t) return;
+      let dx = t.x-s.x, dy = t.y-s.y;
+      let dist = Math.sqrt(dx*dx+dy*dy)||1;
+      let f = (dist-70)*0.02;
+      s.vx += dx/dist*f; s.vy += dy/dist*f;
+      t.vx -= dx/dist*f; t.vy -= dy/dist*f;
+    });
+    nodes.forEach(n => {
+      n.vx += (W/2-n.x)*0.003; n.vy += (H/2-n.y)*0.003;
+      n.x += n.vx*0.5; n.y += n.vy*0.5;
+      n.vx *= 0.85; n.vy *= 0.85;
+      n.x = Math.max(30, Math.min(W-30, n.x));
+      n.y = Math.max(30, Math.min(H-30, n.y));
+    });
+  }
+}
+
+// === Render ===
+function render() {
+  const filter = currentFilter;
+  const searchTerm = document.getElementById('search').value.toLowerCase().trim();
+  svgEl.innerHTML = '';
+
+  // Apply transform group
+  const gWrap = document.createElementNS('http://www.w3.org/2000/svg','g');
+  gWrap.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
+  svgEl.appendChild(gWrap);
+
+  // Links
+  const visibleLinks = [];
+  links.forEach(l => {
+    const s = nodeMap[l.source], t = nodeMap[l.target];
+    if (!s||!t) return;
+    if (filter && s.type === "page" && s.category !== filter) return;
+    if (filter && t.type === "page" && t.category !== filter) return;
+    visibleLinks.push({l, s, t});
+  });
+
+  visibleLinks.forEach(({l,s,t}) => {
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',s.x); line.setAttribute('y1',s.y);
+    line.setAttribute('x2',t.x); line.setAttribute('y2',t.y);
+    line.setAttribute('class','link');
+    line.id = `link-${l.source}-${l.target}`;
+    if (searchTerm) {
+      const match = (s.label||'').toLowerCase().includes(searchTerm) || (t.label||'').toLowerCase().includes(searchTerm);
+      line.classList.add(match ? 'highlight' : 'dimmed');
+    }
+    gWrap.appendChild(line);
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    if (filter && n.type === "page" && n.category !== filter) return;
+    if (filter && n.type === "tag") {
+      const has = visibleLinks.some(l => (l.l.source===n.id || l.l.target===n.id));
+      if (!has) return;
+    }
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','node');
+    g.setAttribute('transform',`translate(${n.x},${n.y})`);
+
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('r', Math.max(3, n.r||6));
+    c.setAttribute('fill', n.color);
+    c.setAttribute('opacity', n.opacity||0.9);
+    c.setAttribute('stroke', n.type==="page"?'#0a0e1a':'transparent');
+    c.setAttribute('stroke-width','1.5');
+    g.appendChild(c);
+
+    // Labels: show for pages and important tags
+    if (n.type === "page" || (n.type === "tag" && n.r > 7)) {
+      const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+      text.setAttribute('class','node-label');
+      text.setAttribute('y', -(n.r||6) - 4);
+      text.textContent = n.label.length > 22 ? n.label.substring(0,20)+'..' : n.label;
+      if (searchTerm && !n.label.toLowerCase().includes(searchTerm)) {
+        text.classList.add('dimmed');
+        g.classList.add('dimmed');
+      }
+      g.appendChild(text);
+    }
+
+    g.onclick = (e) => {
+      e.stopPropagation();
+      if (n.type === "page") showDetail(n.page);
+      else highlightTag(n.label);
+    };
+
+    // Drag
+    let dragging = false, startX, startY;
+    g.onmousedown = (e) => {
+      dragging = true; startX = e.clientX; startY = e.clientY;
+      e.preventDefault(); e.stopPropagation();
+    };
+    document.onmousemove = (e) => {
+      if (dragging) {
+        const rect = svgEl.getBoundingClientRect();
+        n.x = (e.clientX - rect.left - panX) / zoom;
+        n.y = (e.clientY - rect.top - panY) / zoom;
+        simulate(5);
+        render();
+      } else if (panning) {
+        panX = e.clientX - panStartX;
+        panY = e.clientY - panStartY;
+        render();
+      }
+    };
+    document.onmouseup = () => { dragging = false; panning = false; };
+
+    gWrap.appendChild(g);
+  });
+}
+
+// === Detail panel ===
+function showDetail(p) {
+  document.getElementById('d-title').textContent = p.title.replace(/-/g,' ');
+  document.getElementById('d-meta').innerHTML = `类型: <b style="color:${NODE_COLOR[p.category]}">${p.category}</b> · 评分: <b>${p.score}/10</b><br>路径: <code>${p.path}</code>`;
+  document.getElementById('d-tags').innerHTML = p.tags.map(t=>`<span class="tag-s" style="color:#22d3ee">#${t}</span>`).join('');
+  document.getElementById('d-summary').textContent = p.summary || '';
+  document.getElementById('detail').classList.add('open');
+}
+
+// === Highlight tag ===
+function highlightTag(tag) {
+  document.querySelectorAll('.link').forEach(l => l.classList.remove('highlight'));
+  links.forEach(l => {
+    const t = nodeMap[l.target];
+    if (t && t.label === tag) {
+      const el = document.getElementById(`link-${l.source}-${l.target}`);
+      if (el) el.classList.add('highlight');
+    }
+  });
+}
+
+// === Zoom & Pan ===
+let panning = false, panStartX = 0, panStartY = 0;
+
+svgEl = document.getElementById('svg');
+W = document.getElementById('graph').clientWidth;
+H = document.getElementById('graph').clientHeight;
+svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+svgEl.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const newZoom = Math.max(0.2, Math.min(5, zoom * delta));
+  // Zoom toward mouse position
+  const rect = svgEl.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  panX = mx - (mx - panX) * (newZoom / zoom);
+  panY = my - (my - panY) * (newZoom / zoom);
+  zoom = newZoom;
+  render();
+  updateStatus();
+});
+
+svgEl.addEventListener('mousedown', (e) => {
+  if (e.target === svgEl || e.target.tagName === 'svg') {
+    panning = true; panStartX = e.clientX - panX; panStartY = e.clientY - panY;
+  }
+});
+
+document.getElementById('zoom-in').onclick = () => { zoom = Math.min(5, zoom*1.2); render(); updateStatus(); };
+document.getElementById('zoom-out').onclick = () => { zoom = Math.max(0.2, zoom*0.8); render(); updateStatus(); };
+document.getElementById('zoom-reset').onclick = () => { zoom = 1; panX = 0; panY = 0; render(); updateStatus(); };
+
+function updateStatus() { document.getElementById('status').textContent = `缩放: ${zoom.toFixed(1)}x`; }
+
+// === Search ===
+document.getElementById('search').oninput = () => render();
+
+// === Filter buttons ===
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('#controls .btn, #sidebar .btn').forEach(b => b.classList.remove('active'));
+  const id = f==='entities'?'btn-entities':f==='sources'?'btn-sources':'btn-all';
+  document.getElementById(id).classList.add('active');
+  render();
+}
+document.getElementById('btn-all').onclick = () => setFilter(null);
+document.getElementById('btn-entities').onclick = () => setFilter('entities');
+document.getElementById('btn-sources').onclick = () => setFilter('sources');
+
+// === Init ===
+(async () => {
+  try {
+    document.getElementById('loading').textContent = '⏳ 从 MCP 加载知识库...';
+    const pages = await fetchPages();
+    if (pages && pages.length > 0) {
+      document.getElementById('loading').style.display = 'none';
+      buildGraph(pages);
+      document.getElementById('status').textContent = `✅ ${pages.length} 条知识 · 实时数据`;
+    } else {
+      throw new Error('MCP 返回空');
+    }
+  } catch (err) {
+    console.log('MCP fetch failed, using fallback:', err.message);
+    document.getElementById('loading').textContent = '⚠️ MCP 不可达，使用内置数据';
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+      buildGraph(FALLBACK_PAGES);
+      document.getElementById('status').textContent = `⚠️ 离线模式 · ${FALLBACK_PAGES.length} 条`;
+    }, 800);
+  }
+})();
+</script>
+</body>
+</html>
