@@ -122,6 +122,18 @@ let zoom = 1, panX = 0, panY = 0;
 let currentFilter = null;
 
 // === Fetch from MCP ===
+// === Helper: parse SSE response ===
+async function parseSSEResponse(resp) {
+  const text = await resp.text();
+  const lines = text.split('\r\n');
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      return JSON.parse(line.substring(6));
+    }
+  }
+  throw new Error('No data line in SSE response');
+}
+
 async function fetchPages() {
   // 动态 import MCP client（如果环境支持）
   // 浏览器里没有 mcp SDK，改用 fetch 直接调 streamable-http
@@ -137,9 +149,11 @@ async function fetchPages() {
       params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'kg-graph', version: '1.0' } }
     })
   });
+
+  // streamable-http 返回 SSE 格式，需要解析
+  const initBody = await parseSSEResponse(resp);
   // streamable-http 需要先 initialize 再 call tool
   const sessHeader = resp.headers.get('Mcp-Session-Id') || '';
-  const initBody = await resp.json();
 
   async function callTool(name, args) {
     const r = await fetch(MCP_URL, {
@@ -147,7 +161,7 @@ async function fetchPages() {
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name, arguments: args } })
     });
-    const body = await r.json();
+    const body = await parseSSEResponse(r);
     if (body.error) throw new Error(JSON.stringify(body.error));
     // result.content 是数组，每个有 text 字段
     const items = [];
