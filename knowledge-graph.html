@@ -127,7 +127,11 @@ async function fetchPages() {
   // 浏览器里没有 mcp SDK，改用 fetch 直接调 streamable-http
   const resp = await fetch(MCP_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_TOKEN}` },
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Accept': 'application/json, text/event-stream',
+      'Authorization': `Bearer ${MCP_TOKEN}` 
+    },
     body: JSON.stringify({
       jsonrpc: '2.0', id: 1, method: 'initialize',
       params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'kg-graph', version: '1.0' } }
@@ -140,7 +144,7 @@ async function fetchPages() {
   async function callTool(name, args) {
     const r = await fetch(MCP_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name, arguments: args } })
     });
     const body = await r.json();
@@ -158,7 +162,7 @@ async function fetchPages() {
   // 发送 initialized 通知
   await fetch(MCP_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream', 'Authorization': `Bearer ${MCP_TOKEN}`, 'Mcp-Session-Id': sessHeader },
     body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
   });
 
