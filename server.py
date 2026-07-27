@@ -419,10 +419,10 @@ def _run_with_auth(host: str, port: int, auth_token: str):
     app.routes.insert(0, Route("/graph", graph_route, methods=["GET"]))
 
     async def auth_middleware(request, call_next):
-        # 健康检查和知识图谱页面放行（无需 token）
-        if request.url.path in ("/healthz", "/health", "/", "/graph"):
+        # 放行 OPTIONS 预检、健康检查、知识图谱页面
+        if request.method == "OPTIONS" or request.url.path in ("/healthz", "/health", "/", "/graph"):
             return await call_next(request)
-        # 校验 token：Authorization: Bearer <t> 或 ?token=<t>
+        # 校验 token：Authorization: Bearer *** 或 ?token=<t>
         auth = request.headers.get("Authorization", "")
         q_token = request.query_params.get("token", "")
         ok = False
@@ -438,11 +438,11 @@ def _run_with_auth(host: str, port: int, auth_token: str):
             )
         return await call_next(request)
 
-    app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
-
-    # CORS 中间件：允许浏览器端直接 fetch MCP 端点（知识图谱可视化等）
+    # CORS 中间件要先添加（后执行），确保预检响应带上 CORS 头
     from starlette.middleware.cors import CORSMiddleware
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["mcp-session-id"])
+
+    app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 
     print(f"[auth] MCP 端点已启用 Bearer token 认证 (port {port})", flush=True)
     uvicorn.run(app, host=host, port=port)
