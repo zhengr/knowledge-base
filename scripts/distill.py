@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import glob
+import time
 import datetime
 import urllib.request
 
@@ -87,6 +88,9 @@ def _chat(system, user, max_tokens=900):
         except Exception as e:
             last_err = e
             print(f"    [retry {attempt+1}/3] {e}", file=sys.stderr)
+            if attempt < 2:
+                import time as _t
+                _t.sleep(5 * (attempt + 1))  # 退避：5s, 10s
     raise RuntimeError(f"LLM 调用失败: {last_err}")
 
 
@@ -223,6 +227,7 @@ def main():
                 f.write(page)
             made += 1
             print(f"  [ok] {category}/{safe}.md")
+            time.sleep(2)  # 避免 LLM 429 限流
     print(f"[done] 新增 wiki 页面 {made} 个")
 
 

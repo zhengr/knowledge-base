@@ -315,9 +315,12 @@ def _collect_loop():
         return
 
     def do_collect():
+        env = dict(os.environ)
+        env["KB_REPO_ROOT"] = KB_PATH  # collect 把 KB_PATH 当作 REPO_ROOT
         subprocess.run(
             ["python", collect_script],
             cwd=KB_PATH,
+            env=env,
             timeout=600,  # 最多 10 分钟
         )
         print(f"[collect] 本地采集完成: {KB_PATH}/raw/inbox", flush=True)

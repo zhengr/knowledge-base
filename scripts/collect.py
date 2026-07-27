@@ -19,7 +19,7 @@ import urllib.parse
 import datetime
 import xml.etree.ElementTree as ET
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.environ.get("KB_REPO_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INBOX = os.path.join(REPO_ROOT, "raw", "inbox")
 TODAY = datetime.date.today().strftime("%Y-%m-%d")
 
